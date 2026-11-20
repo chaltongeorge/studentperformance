@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Analytics & Academic Portal</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- SheetJS for reading/writing .xlsx files -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js for Dashboard & Student Progression Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <!-- jsPDF & AutoTable for PDF Report Card Export -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-crest">🦚</div>
+      <div>
+        <h1>Student Academic Portal</h1>
+        <span id="fileStatus" class="badge badge-ok">Loaded: Class_6_to_9_Student_Marks_Sheet.xlsx</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="exportFailedTopBtn" class="btn btn-danger-outline">📥 Export Failed (.xlsx)</button>
+      <button id="adminToggleBtn" class="btn btn-outline-peacock">🔒 Admin Login</button>
+      <button id="saveExcelBtn" class="btn btn-success hidden">💾 Save to Excel</button>
+    </div>
+  </header>
+
+  <!-- Welcome / File Load Prompt -->
+  <main id="emptyState" class="empty-container hidden">
+    <section class="empty-state">
+      <h2>Connect Your Multi-Exam Workbook</h2>
+      <p>Select <strong>Class_6_to_9_Student_Marks_Sheet.xlsx</strong> from your folder to analyze all 6 exams (Mid Terms, Quarterly, Half Yearly, Annually) and generate student report cards.</p>
+      <button id="emptyLoadBtn" class="btn btn-peacock btn-lg">Select Class_6_to_9_Student_Marks_Sheet.xlsx</button>
+    </section>
+  </main>
+
+  <!-- Main Workspace with Left Vertical Sidebar -->
+  <div id="appLayout" class="app-layout">
+    <!-- Left Vertical Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-group">
+        <span class="sidebar-heading">Class Scope</span>
+        <div id="sidebarClassList" class="vertical-menu">
+          <!-- All Classes, Class 6, Class 7, Class 8, Class 9 -->
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-heading">Sections</span>
+        <div id="sidebarSectionList" class="vertical-menu">
+          <!-- All Sections, Section A, B, C, D -->
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-heading">Exam Term</span>
+        <div id="sidebarExamList" class="vertical-menu">
+          <!-- All Exams, 1st Mid term, Quarterly, 2nd Mid term, Half Yearly, 3rd Mid term, Annually -->
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-heading">Result Status</span>
+        <div id="sidebarStatusList" class="vertical-menu">
+          <!-- All Students, Failed Students -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right Main Content Area -->
+    <section class="main-panel">
+      <!-- Top View Mode Switcher & Current Scope Breadcrumb -->
+      <div class="panel-header">
+        <div class="nav-switcher">
+          <button id="navDashboardBtn" class="nav-pill active">📊 Analytics Dashboard</button>
+          <button id="navRecordsBtn" class="nav-pill">📋 Student Records & History</button>
+        </div>
+
+        <div class="scope-indicator">
+          Viewing: <strong id="currentScopeLabel">All Classes • All Sections • All Exams</strong>
+        </div>
+      </div>
+
+      <!-- ==================== VIEW 1: ANALYTICS DASHBOARD ==================== -->
+      <div id="dashboardView">
+        <!-- KPI Summary Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label" id="dashStrengthLabel">Total Strength</span>
+            <strong id="dashStrength">0</strong>
+            <small id="dashStrengthSub" class="stat-sub">Students enrolled</small>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Overall Percentage</span>
+            <strong id="dashOverallPct">0%</strong>
+            <small id="dashAvgMarksSub" class="stat-sub">Avg Total: 0 / 4200</small>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Overall Pass Rate</span>
+            <strong id="dashPassRate">0%</strong>
+            <small id="dashPassCountSub" class="stat-sub">0 passed all subjects</small>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" id="dashTopperLabel">Top Performer</span>
+            <strong id="dashTopperName">—</strong>
+            <small id="dashTopperScore" class="stat-sub">Score: —</small>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+          <div class="chart-card chart-wide">
+            <div class="chart-header">
+              <h3 id="subjectChartTitle">Subject-Wise Average Marks & Pass Rate (%)</h3>
+            </div>
+            <div class="canvas-box">
+              <canvas id="subjectBarChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 id="strengthChartTitle">Strength Distribution</h3>
+            </div>
+            <div class="canvas-box">
+              <canvas id="strengthDoughnutChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Percentage Bracket Distribution</h3>
+            </div>
+            <div class="canvas-box">
+              <canvas id="gradeDistChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subject-Wise / Exam-Wise Metrics Breakdown Table -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 id="metricsTableTitle">Detailed Performance Metrics</h3>
+          </div>
+          <div class="table-wrapper no-max-height">
+            <table>
+              <thead>
+                <tr>
+                  <th id="metricsColHeader">Subject / Exam</th>
+                  <th>Average Score</th>
+                  <th>Highest Score</th>
+                  <th>Lowest Score</th>
+                  <th>Passed (≥ 35)</th>
+                  <th>Failed (&lt; 35)</th>
+                  <th>Pass %</th>
+                </tr>
+              </thead>
+              <tbody id="subjectMetricsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== VIEW 2: STUDENT RECORDS & HISTORY ==================== -->
+      <div id="recordsView" class="hidden">
+        <div class="records-toolbar">
+          <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 Search Student Name or Roll No for Full History..." />
+          </div>
+          <div class="toolbar-right">
+            <button id="exportFailedRecordsBtn" class="btn btn-danger-outline btn-sm">📥 Export Failed (.xlsx)</button>
+            <div class="mini-stats">
+              <span>Showing: <strong id="statCount">0</strong></span>
+              <span>Avg: <strong id="statAvg">0%</strong></span>
+              <span>Pass Rate: <strong id="statPass">0%</strong></span>
+              <span>Mode: <strong id="statMode" class="peacock-text">View Only</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instant Student Search History Banner (Appears when searching a student) -->
+        <div id="quickSearchBanner" class="search-history-banner hidden">
+          <div>
+            <span class="banner-eyebrow">🎓 Student Match Found</span>
+            <h4 id="quickMatchTitle">Student Name (Roll No)</h4>
+            <p id="quickMatchSummary">Overall Avg: 0% • Status: PASS</p>
+          </div>
+          <div class="banner-actions">
+            <button id="quickViewHistoryBtn" class="btn btn-peacock btn-sm">📜 View Complete 6-Exam History</button>
+            <button id="quickExportPdfBtn" class="btn btn-gold btn-sm">📕 Export PDF Report Card</button>
+          </div>
+        </div>
+
+        <div id="adminBanner" class="admin-banner hidden">
+          <span>🛡️ <strong>Admin Mode Active:</strong> Click <em>Edit</em> on any student row to modify marks across all 6 exams, then click <strong>Save to Excel</strong> to overwrite <code>Class_6_to_9_Student_Marks_Sheet.xlsx</code> in this folder.</span>
+          <button id="addStudentBtn" class="btn btn-peacock btn-sm">+ Add New Student</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead id="recordsTableHead"></thead>
+            <tbody id="studentTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Complete Student History & PDF Report Card Modal -->
+  <div id="historyModal" class="modal hidden">
+    <div class="modal-content modal-xl">
+      <div class="modal-top-bar">
+        <div>
+          <span class="badge badge-ok" id="histClassBadge">Class 6 • Section A</span>
+          <h2 id="histStudentName">Student Name</h2>
+          <p class="hint" id="histRollInfo">Roll No: 60000 • Overall Cumulative Score: 0 / 4200 (0%)</p>
+        </div>
+        <div class="modal-top-actions">
+          <button id="downloadReportCardPdfBtn" class="btn btn-gold">📕 Export Report Card (PDF)</button>
+          <button id="closeHistoryBtn" class="btn btn-outline-peacock">✕ Close</button>
+        </div>
+      </div>
+
+      <!-- Summary Strip inside Modal -->
+      <div class="history-kpi-strip" id="histKpiStrip"></div>
+
+      <!-- Progression Chart across 6 Exams -->
+      <div class="chart-card history-chart-box">
+        <div class="chart-header">
+          <h3>Academic Progression Across All 6 Exams (%)</h3>
+        </div>
+        <div class="canvas-box-sm">
+          <canvas id="studentHistoryChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Complete 6-Exam Subject Matrix -->
+      <div class="table-wrapper no-max-height">
+        <table>
+          <thead>
+            <tr>
+              <th>Subject</th>
+              <th>1st Mid Term<br><small>(100)</small></th>
+              <th>Quarterly<br><small>(100)</small></th>
+              <th>2nd Mid Term<br><small>(100)</small></th>
+              <th>Half Yearly<br><small>(100)</small></th>
+              <th>3rd Mid Term<br><small>(100)</small></th>
+              <th>Annually<br><small>(100)</small></th>
+              <th>Subject Avg</th>
+            </tr>
+          </thead>
+          <tbody id="historyMatrixBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Login Modal -->
+  <div id="loginModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Admin Authentication</h3>
+      <p class="hint">Enter administrator credentials to unlock editing.</p>
+      <input type="password" id="adminPassword" placeholder="Enter Admin Password" autocomplete="off" />
+      <p id="loginError" class="error-text hidden">Incorrect password. Access denied.</p>
+      <div class="modal-actions">
+        <button id="cancelLoginBtn" class="btn btn-outline-peacock">Cancel</button>
+        <button id="confirmLoginBtn" class="btn btn-peacock">Unlock Admin</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit / Add Student Modal (All 6 Exams) -->
+  <div id="editModal" class="modal hidden">
+    <div class="modal-content modal-lg">
+      <div class="modal-top-bar">
+        <h3 id="editModalTitle">Edit Student Academic Record</h3>
+        <button type="button" id="cancelEditTopBtn" class="btn btn-outline-peacock btn-sm">✕</button>
+      </div>
+      <form id="studentForm">
+        <input type="hidden" id="editRowIndex" />
+        <input type="hidden" id="editRowClass" />
+
+        <div class="form-grid-4">
+          <label id="classSelectWrap" class="hidden">
+            Class
+            <select id="fieldClass"></select>
+          </label>
+          <label>Roll No <input type="number" id="fieldRoll" required /></label>
+          <label>Student Name <input type="text" id="fieldName" required /></label>
+          <label>Section <input type="text" id="fieldSection" maxlength="3" required /></label>
+        </div>
+
+        <!-- Exam Tabs inside Admin Edit Modal -->
+        <div class="edit-exam-tabs" id="editExamTabs"></div>
+        <div id="editExamFieldsContainer" class="form-grid-3"></div>
+
+        <div class="modal-actions">
+          <button type="button" id="cancelEditBtn" class="btn btn-outline-peacock">Cancel</button>
+          <button type="submit" class="btn btn-peacock">Update All Marks</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
